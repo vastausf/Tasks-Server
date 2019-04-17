@@ -1,5 +1,3 @@
-import module.auth.UserDataFull
-
 object TokenStore {
 
     fun createToken(userData: UserDataFull): String {

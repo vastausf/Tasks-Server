@@ -8,6 +8,18 @@ suspend fun PipelineContext<Unit, ApplicationCall>.respondUnauthorized() {
     call.respond(HttpStatusCode.Unauthorized)
 }
 
+suspend fun PipelineContext<Unit, ApplicationCall>.respondNotFound() {
+    call.respond(HttpStatusCode.NotFound)
+}
+
 suspend fun PipelineContext<Unit, ApplicationCall>.respondSuccess(data: Any) {
     call.respond(HttpStatusCode.OK, data.writeValueAsString())
+}
+
+suspend fun PipelineContext<Unit, ApplicationCall>.respondBadRequest() {
+    call.respond(HttpStatusCode.BadRequest)
+}
+
+suspend fun PipelineContext<Unit, ApplicationCall>.respondForbidden() {
+    call.respond(HttpStatusCode.Forbidden)
 }

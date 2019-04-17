@@ -1,20 +1,16 @@
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import module.auth.UserDataFull
-import module.project.ProjectData
-import module.project.ProjectDataFull
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.and
+import module.project.*
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.joda.time.DateTime
 
 object DatabaseClient {
     init {
         Database.connect(
-            "jdbc:h2:tcp:194.1.239.114:9092/./root/tasks_server/database",
-            "org.h2.Driver",
-            "tasks_server",
-            "tasks2043"
+            configuration.databaseUrl,
+            configuration.databaseDriver,
+            configuration.databaseUser,
+            configuration.databasePassword
         )
 
         transaction {
@@ -23,8 +19,6 @@ object DatabaseClient {
 
         //createUsers()
     }
-
-    val json = jacksonObjectMapper()
 
     fun createUsers() {
         val users = listOf(
@@ -89,10 +83,10 @@ object DatabaseClient {
                 UserRow.new {
                     this.login = "$firstName.$lastName"
                     this.password = "$firstName$lastName$middleName".getHashSHA256()
-                    this.firstName = firstName
-                    this.lastName = lastName
-                    this.middleName = middleName
-                    this.email = "$firstName.$lastName@mail.com"
+                    this.firstName = firstName.capitalize()
+                    this.lastName = lastName.capitalize()
+                    this.middleName = middleName.capitalize()
+                    this.email = "$firstName.$lastName@mail.com".decapitalize()
                 }
             }
         }
@@ -126,22 +120,197 @@ object DatabaseClient {
         }
     }
 
+    fun findUserByParameters(offset: Int, limit: Int, parameters: UserDataSearch): List<UserData> = transaction {
+        val query = UsersTable.selectAll()
 
-    fun createProject(projectData: ProjectData): ProjectDataFull = transaction {
+        parameters.firstName?.let { query.andWhere { UsersTable.firstName.lowerCase() like "%${it.decapitalize()}%" } }
+        parameters.lastName?.let { query.andWhere { UsersTable.firstName.lowerCase() like "%${it.decapitalize()}%" } }
+        parameters.middleName?.let { query.andWhere { UsersTable.firstName.lowerCase() like "%${it.decapitalize()}%" } }
+        parameters.email?.let { query.andWhere { UsersTable.firstName.lowerCase() like "%${it.decapitalize()}%" } }
+
+        return@transaction query.limit(limit, offset).map {
+            UserData(
+                it[UsersTable.id].value,
+                it[UsersTable.email],
+                it[UsersTable.lastName],
+                it[UsersTable.firstName],
+                it[UsersTable.middleName]
+            )
+        }
+    }
+
+
+    fun createProject(userId: Int, projectData: ProjectDataCreate): ProjectDataFull = transaction {
         ProjectRow.new {
-            title = projectData.title
-            documents = projectData.documents.writeValueAsString()
-            credentials = projectData.credentials.writeValueAsString()
-            description = projectData.description
-            specification = projectData.specification
+            title = projectData.title.trimAllSpaces()
+            created = userId
+            documents = projectData.documents.writeValueAsString().trimAllSpaces()
+            credentials = projectData.credentials.writeValueAsString().trimAllSpaces()
+            description = projectData.description.trimAllSpaces()
+            specification = projectData.specification.trimAllSpaces()
         }.run {
             ProjectDataFull(
                 id.value,
                 title,
                 description,
                 specification,
-                json.readValue(credentials),
-                json.readValue(documents)
+                json.readValue(documents),
+                UserRow.find { UsersTable.id inList json.readValue<List<Int>>(credentials) }.map { user ->
+                    UserData(
+                        user.id.value,
+                        user.email,
+                        user.lastName,
+                        user.firstName,
+                        user.middleName
+                    )
+                },
+                created
+            )
+        }
+    }
+
+    fun editProject(projectId: Int, newData: ProjectDataEdit): ProjectDataFull? = transaction {
+        ProjectRow.findById(projectId)?.apply {
+            newData.title?.let { title = it.trimAllSpaces() }
+            newData.description?.let { description = it.trimAllSpaces() }
+            newData.specification?.let { specification = it.trimAllSpaces() }
+            newData.documents?.let { documents = it.writeValueAsString().trimAllSpaces() }
+            newData.credentials?.let { credentials = it.writeValueAsString().trimAllSpaces() }
+        }?.run {
+            ProjectDataFull(
+                id.value,
+                title,
+                description,
+                specification,
+                json.readValue(documents),
+                UserRow.find { UsersTable.id inList json.readValue<List<Int>>(credentials) }.map { user ->
+                    UserData(
+                        user.id.value,
+                        user.email,
+                        user.lastName,
+                        user.firstName,
+                        user.middleName
+                    )
+                },
+                created
+            )
+        }
+    }
+
+    fun canEditProject(userId: Int, projectId: Int): Boolean = transaction {
+        val project = ProjectRow.findById(projectId)
+
+        return@transaction if (project != null) {
+            userId in json.readValue<List<Int>>(project.credentials) || userId == project.created
+        } else false
+    }
+
+    fun findProjectByParameters(offset: Int, limit: Int, parameters: ProjectDataSearch, userId: Int): List<ProjectDataFull> = transaction {
+        val query = ProjectsTable.selectAll()
+
+        parameters.id?.let {query.andWhere { ProjectsTable.id eq it } }
+        parameters.title?.let { query.andWhere { ProjectsTable.title.lowerCase() like "%${it.decapitalize()}%" } }
+        parameters.description?.let { query.andWhere { ProjectsTable.description.lowerCase() like "%${it.decapitalize()}%" } }
+
+        return@transaction query.limit(limit, offset).filter {
+            userId in json.readValue<List<Int>>(it[ProjectsTable.credentials]) || userId == it[ProjectsTable.created]
+        }.map {
+            ProjectDataFull(
+                it[ProjectsTable.id].value,
+                it[ProjectsTable.title],
+                it[ProjectsTable.description],
+                it[ProjectsTable.specification],
+                json.readValue(it[ProjectsTable.documents]),
+                UserRow.find { UsersTable.id inList json.readValue<List<Int>>(it[ProjectsTable.credentials]) }.map { user ->
+                    UserData(
+                        user.id.value,
+                        user.email,
+                        user.lastName,
+                        user.firstName,
+                        user.middleName
+                    )
+                },
+                it[ProjectsTable.created]
+            )
+        }
+    }
+
+
+    fun createTask(userId: Int, taskData: TaskDataCreate): TaskDataFull = transaction {
+        TaskRow.new {
+            project = taskData.project
+            title = taskData.title.trimAllSpaces()
+            created = userId
+            assigned = taskData.assigned
+            description = taskData.description
+            documents = taskData.documents.writeValueAsString()
+        }.run {
+            TaskDataFull(
+                id.value,
+                project,
+                title,
+                status,
+                created,
+                assigned,
+                description,
+                time.millis,
+                json.readValue(documents),
+                json.readValue(history)
+            )
+        }
+    }
+
+    fun editTask(taskId: Int, newData: TaskDataEdit): TaskDataFull? = transaction {
+        TaskRow.findById(taskId)?.apply {
+            newData.title?.let { title = it }
+            newData.assigned?.let { assigned = it }
+            newData.description?.let { description = it }
+            newData.documents?.let { documents = it.writeValueAsString() }
+        }?.run {
+            TaskDataFull(
+                id.value,
+                project,
+                title,
+                status,
+                created,
+                assigned,
+                description,
+                time.millis,
+                json.readValue(documents),
+                json.readValue(history)
+            )
+        }
+    }
+
+    fun canEditTask(userId: Int, taskId: Int): Boolean = transaction {
+        val task = TaskRow.findById(taskId)
+
+        return@transaction if (task != null) {
+            userId == task.created
+        } else false
+    }
+
+    fun editTaskStatus(taskId: Int, userId: Int, comment: String, newStatus: Int): TaskDataFull? = transaction {
+        TaskRow.findById(taskId)?.apply {
+            history = (json.readValue<MutableList<HistoryItem>>(history) + HistoryItem(
+                userId,
+                status,
+                newStatus,
+                DateTime.now().millis,
+                comment
+            )).writeValueAsString()
+        }?.run {
+            TaskDataFull(
+                id.value,
+                project,
+                title,
+                status,
+                created,
+                assigned,
+                description,
+                time.millis,
+                json.readValue(documents),
+                json.readValue(history)
             )
         }
     }

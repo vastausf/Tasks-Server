@@ -4,7 +4,6 @@ import io.ktor.application.ApplicationCall
 import io.ktor.application.call
 import io.ktor.request.receive
 import io.ktor.util.pipeline.PipelineContext
-import module.auth.UserDataFull
 import java.security.MessageDigest
 
 fun String.getHashSHA256(): String {
@@ -15,11 +14,11 @@ fun String.getHashSHA256(): String {
     }
 }
 
-fun Any.writeValueAsString(): String =
-    jacksonObjectMapper().writeValueAsString(this)
-
 fun String.trimAllSpaces(): String =
     Regex("\\s+").replace(this, " ").trim()
+
+fun Any.writeValueAsString(): String =
+    jacksonObjectMapper().writeValueAsString(this)
 
 suspend inline fun <reified T> PipelineContext<Unit, ApplicationCall>.getBody(): T {
     return jacksonObjectMapper().readValue(call.receive<String>())
@@ -31,10 +30,6 @@ suspend inline fun <reified T> PipelineContext<Unit, ApplicationCall>.authUser(b
 
         val userData = DatabaseClient.findUserById(token.split(":")[0].toInt()) ?: throw UserUnauthorized()
 
-        println(TokenStore.createToken(userData))
-        println(token)
-        println(userData)
-
         if (TokenStore.createToken(userData) == token) {
             block(userData, getBody())
         } else {
@@ -42,5 +37,8 @@ suspend inline fun <reified T> PipelineContext<Unit, ApplicationCall>.authUser(b
         }
     } catch (e: UserUnauthorized) {
         respondUnauthorized()
+    } catch (e: Throwable) {
+        println(e.printStackTrace())
+        respondBadRequest()
     }
 }

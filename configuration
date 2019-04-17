@@ -1,0 +1,6 @@
+{
+    "databaseUrl": "jdbc:h2:tcp:194.1.239.114:9092/~/tasksS/database/tasks_db",
+    "databaseDriver": "org.h2.Driver",
+    "databaseUser": "tasks_server",
+    "databasePassword": "tasks2043"
+}
