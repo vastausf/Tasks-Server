@@ -25,9 +25,20 @@ object ProjectsTable : IntIdTable() {
     val title = varchar("title", 64)
     val created = integer("created")
     val documents = text("documents")
-    val credentials = text("credentials")
     val description = text("description")
     val specification = text("specification")
+}
+
+object ProjectCredentials: IntIdTable() {
+    val project = reference("project", ProjectsTable)
+    val user = reference("user", UsersTable)
+}
+
+class ProjectCredentialRow(id: EntityID<Int>): IntEntity(id) {
+    companion object : IntEntityClass<ProjectCredentialRow>(ProjectCredentials)
+
+    var project by ProjectCredentialRow referencedOn ProjectCredentials.project
+    var user by ProjectCredentialRow referencedOn ProjectCredentials.user
 }
 
 class ProjectRow(id: EntityID<Int>): IntEntity(id) {
@@ -37,8 +48,8 @@ class ProjectRow(id: EntityID<Int>): IntEntity(id) {
     var created by ProjectsTable.created
     var documents by ProjectsTable.documents
     var description by ProjectsTable.description
-    var credentials by ProjectsTable.credentials
     var specification by ProjectsTable.specification
+    var tasks by TaskRow referencedOn ProjectsTable.tasks
 }
 
 object TasksTable : IntIdTable() {
@@ -46,7 +57,7 @@ object TasksTable : IntIdTable() {
     val title = varchar("title", 64)
     val status = integer("status").default(0)
     val history = text("history").default(emptyList<HistoryItem>().writeValueAsString())
-    val project = integer("project")
+    val project = reference("project", ProjectsTable)
     val created = integer("created")
     val assigned = integer("assigned")
     val documents = text("documents")
@@ -60,7 +71,7 @@ class TaskRow(id: EntityID<Int>): IntEntity(id) {
     var title by TasksTable.title
     var status by TasksTable.status
     var history by TasksTable.history
-    var project by TasksTable.project
+    var project by ProjectRow referencedOn TasksTable.project
     var created by TasksTable.created
     var assigned by TasksTable.assigned
     var documents by TasksTable.documents

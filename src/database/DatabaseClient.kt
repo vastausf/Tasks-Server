@@ -164,7 +164,21 @@ object DatabaseClient {
                         user.middleName
                     )
                 },
-                created
+                created,
+                TaskRow.find { TasksTable.project eq id.value }.map { task ->
+                    TaskDataFull(
+                        task.id.value,
+                        task.project,
+                        task.title,
+                        task.status,
+                        task.created,
+                        task.assigned,
+                        task.description,
+                        task.time.millis,
+                        json.readValue(task.documents),
+                        json.readValue(task.history)
+                    )
+                }
             )
         }
     }
@@ -192,7 +206,21 @@ object DatabaseClient {
                         user.middleName
                     )
                 },
-                created
+                created,
+                TaskRow.find { TasksTable.project eq id.value }.map { task ->
+                    TaskDataFull(
+                        task.id.value,
+                        task.project,
+                        task.title,
+                        task.status,
+                        task.created,
+                        task.assigned,
+                        task.description,
+                        task.time.millis,
+                        json.readValue(task.documents),
+                        json.readValue(task.history)
+                    )
+                }
             )
         }
     }
@@ -230,7 +258,21 @@ object DatabaseClient {
                         user.middleName
                     )
                 },
-                it[ProjectsTable.created]
+                it[ProjectsTable.created],
+                TaskRow.find { TasksTable.project eq it[ProjectsTable.id].value }.map { task ->
+                    TaskDataFull(
+                        task.id.value,
+                        task.project,
+                        task.title,
+                        task.status,
+                        task.created,
+                        task.assigned,
+                        task.description,
+                        task.time.millis,
+                        json.readValue(task.documents),
+                        json.readValue(task.history)
+                    )
+                }
             )
         }
     }

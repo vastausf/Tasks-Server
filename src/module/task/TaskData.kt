@@ -27,6 +27,7 @@ data class TaskStatusEditO(
 
 
 data class TaskData(
+    val id: Int,
     val project: Int,
     val title: String,
     val status: Int,

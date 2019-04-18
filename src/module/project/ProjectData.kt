@@ -1,6 +1,7 @@
 package module.project
 
 import UserData
+import TaskDataFull
 
 data class ProjectNewI(
     val data: ProjectDataCreate
@@ -52,7 +53,8 @@ data class ProjectDataFull(
     val specification: String,
     val documents: List<String>,
     val credentials: List<UserData>,
-    val created: Int
+    val created: Int,
+    val tasks: List<TaskDataFull>
 )
 
 data class ProjectDataEdit(
