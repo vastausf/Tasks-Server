@@ -44,12 +44,12 @@ class ProjectCredentialRow(id: EntityID<Int>): IntEntity(id) {
 class ProjectRow(id: EntityID<Int>): IntEntity(id) {
     companion object : IntEntityClass<ProjectRow>(ProjectsTable)
 
+    var tasks by TaskRow referencedOn ProjectsTable.tasks
     var title by ProjectsTable.title
     var created by ProjectsTable.created
     var documents by ProjectsTable.documents
     var description by ProjectsTable.description
     var specification by ProjectsTable.specification
-    var tasks by TaskRow referencedOn ProjectsTable.tasks
 }
 
 object TasksTable : IntIdTable() {
